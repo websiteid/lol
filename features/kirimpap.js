@@ -1,7 +1,21 @@
+const config = require('../config');
+
 module.exports = {
   command: 'kirimpap',
-  description: 'Mengirim media untuk di-rate',
+  description: 'Kirim foto untuk di-rate',
   execute: (bot, msg) => {
-    bot.sendMessage(msg.chat.id, '📤 **Kirim PAP**\n\nPilih mode pengiriman:\n1. Foto\n2. Video\n\nSilakan upload media yang ingin dikirim.', { parse_mode: 'Markdown' });
+    bot.sendMessage(msg.chat.id, '📸 Silakan kirim foto PAP kamu:');
+
+    bot.once('photo', (msg) => {
+      const photoId = msg.photo[msg.photo.length - 1].file_id;
+      
+      // Kirim ke Channel
+      bot.sendPhoto(config.CHANNEL_ID, photoId, { caption: '📸 PAP Baru dari user' });
+      
+      // Kirim ke Admin
+      bot.sendPhoto(config.ADMIN_ID, photoId, { caption: `Log PAP dari ${msg.from.id}` });
+      
+      bot.sendMessage(msg.chat.id, '✅ PAP berhasil dikirim!');
+    });
   }
 };
