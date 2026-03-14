@@ -2,73 +2,122 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 
-// Inisialisasi Database & State Global
-global.papDatabase = global.papDatabase || {};
 global.userState = global.userState || {};
+global.orderDB = global.orderDB || {};
 
 const features = {};
 
-// Load semua file fitur secara otomatis
 const files = fs.readdirSync(__dirname)
   .filter(file => file.endsWith('.js') && file !== 'index.js');
 
 files.forEach(file => {
-  const featureName = path.basename(file, '.js');
-  features[featureName] = require(`./${file}`);
+  const name = path.basename(file, '.js');
+  features[name] = require(`./${file}`);
 });
 
 function register(bot) {
-  console.log('🔧 Registering commands & handlers...');
 
-  // 1. Registrasi Command
-  Object.entries(features).forEach(([name, feature]) => {
+  console.log('🚀 Bot Shop Started');
+
+  // COMMAND
+  Object.values(features).forEach(feature => {
     if (feature.command) {
-      const pattern = new RegExp(`^\\/${feature.command}(?:@\\w+)?$`);
-      bot.onText(pattern, (msg) => feature.execute(bot, msg));
-    }
-  });
-
-  // 2. Handler Pesan Global (Menangkap PAP)
-  bot.on('message', (msg) => {
-    const chatId = msg.chat.id;
-
-    if (global.userState[chatId] && (msg.photo || msg.video)) {
-      const media = msg.photo ? msg.photo[msg.photo.length - 1].file_id : msg.video.file_id;
-      const type = msg.photo ? 'photo' : 'video';
-      const mode = global.userState[chatId];
-      const token = Math.floor(100000 + Math.random() * 900000).toString();
-
-      global.papDatabase[token] = { media, type, mode, sender: msg.from.username || 'Anonim' };
-
-      const channelText = `📸 **NEW PAP**\n\nMode: ${mode}\nToken: \`${token}\`\n\nKirim /ratepap di bot dan masukkan token di atas untuk melihat media!`;
-      
-      bot.sendMessage(config.CHANNEL_ID, channelText, { parse_mode: 'Markdown' });
-      bot.sendMessage(chatId, `✅ Berhasil! Token kamu: \`${token}\``, { parse_mode: 'Markdown' });
-
-      delete global.userState[chatId];
-      return;
-    }
-  });
-
-  // 3. Handler Callback Button
-  bot.on('callback_query', (query) => {
-    const data = query.data;
-    const msg = query.message;
-    const chatId = msg.chat.id;
-
-    if (data === 'mode_publik' || data === 'mode_privat') {
-      const mode = data === 'mode_publik' ? 'Publik' : 'Privat';
-      global.userState[chatId] = mode;
-      bot.editMessageText(`✅ Mode **${mode}** dipilih.\n\nSekarang kirim foto/video PAP kamu:`, {
-        chat_id: chatId,
-        message_id: msg.message_id,
-        parse_mode: 'Markdown'
+      const pattern = new RegExp(`^\\/${feature.command}`);
+      bot.onText(pattern, (msg) => {
+        feature.execute(bot, msg);
       });
-    } else if (features[data.replace('menu_', '')]) {
-      features[data.replace('menu_', '')].execute(bot, msg);
     }
-    bot.answerCallbackQuery(query.id);
   });
+
+  // HANDLE BUKTI TRANSFER
+  bot.on('message', async (msg) => {
+
+    const chatId = msg.chat.id;
+
+    if (global.userState[chatId] === "waiting_payment") {
+
+      if (msg.photo) {
+
+        const order = global.orderDB[chatId];
+
+        bot.sendPhoto(config.ADMIN_ID, msg.photo[msg.photo.length - 1].file_id, {
+          caption:
+`📥 ORDER MASUK
+
+User : @${msg.from.username || "no_username"}
+Produk : ${order.product}
+Harga : ${order.price}`
+        });
+
+        bot.sendMessage(chatId, "⏳ Admin sedang memverifikasi pembayaran...");
+
+        global.userState[chatId] = "waiting_admin";
+
+      }
+
+    }
+
+  });
+
+  // CALLBACK BUTTON
+  bot.on("callback_query", async (q) => {
+
+    const data = q.data;
+    const chatId = q.message.chat.id;
+
+    if (data.startsWith("buy_")) {
+
+      const product = data.replace("buy_", "");
+
+      const productList = {
+        vip: { price: "Rp10.000", file: "VIP ACCESS LINK" },
+        panel: { price: "Rp15.000", file: "PANEL FILE DOWNLOAD" },
+        script: { price: "Rp25.000", file: "SCRIPT BOT DOWNLOAD" }
+      };
+
+      const item = productList[product];
+
+      global.orderDB[chatId] = {
+        product: product,
+        price: item.price,
+        file: item.file
+      };
+
+      global.userState[chatId] = "waiting_payment";
+
+      bot.sendPhoto(chatId, "./assets/qris.jpg", {
+        caption:
+`💳 *Pembayaran QRIS*
+
+Produk : ${product}
+Harga : ${item.price}
+
+⏳ Waktu pembayaran 10 menit
+
+Setelah bayar kirim bukti transfer.`,
+        parse_mode: "Markdown"
+      });
+
+      // TIMER 10 MENIT
+      setTimeout(() => {
+
+        if (global.userState[chatId] === "waiting_payment") {
+
+          delete global.userState[chatId];
+          delete global.orderDB[chatId];
+
+          bot.sendMessage(chatId,"❌ Waktu pembayaran habis.");
+
+        }
+
+      }, 600000);
+
+    }
+
+    bot.answerCallbackQuery(q.id);
+
+  });
+
 }
 
 module.exports = { ...features, register };
