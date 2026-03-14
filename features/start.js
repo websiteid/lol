@@ -1,16 +1,30 @@
 module.exports = {
-  command: 'start',
-  description: 'Menampilkan menu utama',
-  execute: (bot, msg) => {
-    const opts = {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '⭐ Rate PAP', callback_data: 'menu_ratepap' }],
-          [{ text: '📤 Kirim PAP', callback_data: 'menu_kirimpap' }],
-          [{ text: '💌 Menfes', callback_data: 'menu_menfes' }]
-        ]
-      }
-    };
-    bot.sendMessage(msg.chat.id, 'Selamat datang! Silakan pilih menu:', opts);
-  }
-};
+
+command: "start",
+
+execute: async (bot,msg) => {
+
+const chatId = msg.chat.id
+const name = msg.from.first_name
+
+bot.sendMessage(chatId,
+`✨ Halo ${name}
+
+Selamat datang di *Shop Bot*
+
+Silahkan pilih menu`,
+{
+parse_mode:"Markdown",
+reply_markup:{
+inline_keyboard:[
+
+[{text:"🛒 Lihat Produk",callback_data:"menu_produk"}],
+[{text:"📦 Cara Order",callback_data:"menu_help"}]
+
+]
+}
+})
+
+}
+
+}
