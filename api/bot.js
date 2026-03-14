@@ -25,7 +25,7 @@ app.post('/api/bot', async (req, res) => {
 
 app.get('/set-webhook', async (req, res) => {
   try {
-    const vercelUrl = 'https://nnn-tau-jet.vercel.app';
+    const vercelUrl = 'https://lol-five-chi.vercel.app';
     const webhookUrl = `${vercelUrl}/api/bot`;
     await bot.deleteWebHook();
     await bot.setWebHook(webhookUrl);
